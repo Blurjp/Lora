@@ -24,13 +24,13 @@ def setup_logging(log_dir: Path, log_level: str = "INFO") -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / f"app_{datetime.now().strftime('%Y%m%d')}.log"
 
-    # Create logger
+    # Create logger - FORCE DEBUG for detailed I2V debugging
     logger = logging.getLogger("video_service")
-    logger.setLevel(getattr(logging, log_level.upper()))
+    logger.setLevel(logging.DEBUG)  # Always DEBUG for detailed logs
 
-    # Console handler
+    # Console handler - also DEBUG
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, log_level.upper()))
+    console_handler.setLevel(logging.DEBUG)  # Show debug in console too
     console_format = logging.Formatter(
         '%(asctime)s | %(levelname)-8s | %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'

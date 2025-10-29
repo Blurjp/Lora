@@ -17,13 +17,49 @@ Links:
 import logging
 import time
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Callable
 import torch
 import numpy as np
 from PIL import Image
 import imageio
+from tqdm.auto import tqdm
 
 logger = logging.getLogger("video_service")
+
+
+class DebugProgressCallback:
+    """Callback to log detailed generation progress."""
+
+    def __init__(self, logger):
+        self.logger = logger
+        self.step_times = []
+        self.start_time = None
+
+    def __call__(self, step: int, timestep: int, latents: torch.Tensor):
+        if self.start_time is None:
+            self.start_time = time.time()
+
+        elapsed = time.time() - self.start_time
+        self.step_times.append(elapsed)
+
+        # Log detailed step info
+        self.logger.info(f"🔄 Step {step}/50 | Timestep: {timestep:.2f} | Elapsed: {elapsed:.1f}s")
+        self.logger.info(f"   Latent shape: {latents.shape} | Dtype: {latents.dtype} | Device: {latents.device}")
+
+        # Memory info
+        if torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated() / (1024**3)
+            reserved = torch.cuda.memory_reserved() / (1024**3)
+            self.logger.info(f"   GPU Memory: {allocated:.2f}GB allocated, {reserved:.2f}GB reserved")
+
+        # Estimate remaining time
+        if len(self.step_times) > 1:
+            avg_step_time = elapsed / (step + 1)
+            remaining_steps = 50 - (step + 1)
+            eta = avg_step_time * remaining_steps
+            self.logger.info(f"   ETA: {eta/60:.1f} minutes")
+
+        self.logger.info("")  # Blank line for readability
 
 
 class BackendNotAvailable(Exception):
@@ -325,13 +361,43 @@ class CogVideoXBackend:
                         logger.info("Falling back to text-to-video mode")
 
             # Generate video
-            logger.info("Starting generation (this will take 3-15 minutes)...")
+            logger.info("="*70)
+            logger.info("STARTING VIDEO GENERATION")
+            logger.info("="*70)
 
             with torch.no_grad():
                 if ref_image and self.i2v_pipeline:
-                    # Image-to-video generation
-                    # CRITICAL: Do NOT pass height/width for I2V - uses model defaults only
-                    logger.info(f"I2V generation (using model defaults: {cogvideo_width}x{cogvideo_height})")
+                    # Image-to-video generation with detailed debugging
+                    logger.info("🎬 Using I2V (Image-to-Video) pipeline")
+                    logger.info(f"📐 Resolution: {cogvideo_width}x{cogvideo_height} (model defaults)")
+                    logger.info(f"🖼️  Reference image: {ref_image.size}")
+                    logger.info(f"📝 Prompt: {prompt[:100]}...")
+                    logger.info(f"🎲 Seed: {seed}")
+                    logger.info(f"🎞️  Frames: {cogvideo_frames}")
+                    logger.info(f"🔧 Guidance scale: 6.0")
+                    logger.info(f"⚙️  Dynamic CFG: True")
+                    logger.info("")
+
+                    # Log GPU state before generation
+                    if torch.cuda.is_available():
+                        allocated = torch.cuda.memory_allocated() / (1024**3)
+                        reserved = torch.cuda.memory_reserved() / (1024**3)
+                        free = torch.cuda.get_device_properties(0).total_memory / (1024**3) - allocated
+                        logger.info(f"🖥️  GPU State BEFORE generation:")
+                        logger.info(f"   Allocated: {allocated:.2f}GB")
+                        logger.info(f"   Reserved: {reserved:.2f}GB")
+                        logger.info(f"   Free: {free:.2f}GB")
+                        logger.info("")
+
+                    # Create progress callback
+                    progress_callback = DebugProgressCallback(logger)
+
+                    logger.info("🚀 Calling I2V pipeline...")
+                    logger.info("⏳ Waiting for first step (this is where it usually hangs)...")
+                    logger.info("")
+
+                    gen_start = time.time()
+
                     video = self.i2v_pipeline(
                         prompt=prompt,
                         image=ref_image,
@@ -342,7 +408,13 @@ class CogVideoXBackend:
                         guidance_scale=6.0,
                         use_dynamic_cfg=True,
                         generator=generator,
+                        callback=progress_callback,
+                        callback_steps=1,  # Call on every step
                     ).frames[0]
+
+                    gen_elapsed = time.time() - gen_start
+                    logger.info(f"✅ I2V generation completed in {gen_elapsed:.1f}s")
+                    logger.info("")
                 else:
                     # Text-to-video generation
                     if ref_image_path:
