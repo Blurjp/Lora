@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Video Generation Service</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 25px;
+        }
+
+        .warning-box h3 {
+            color: #856404;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .warning-box ul {
+            margin-left: 20px;
+            color: #856404;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: normal;
+        }
+
+        .consent-box {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .consent-box input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .consent-box label {
+            display: inline;
+            color: #721c24;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .btn:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .spinner.active {
+            display: block;
+        }
+
+        .spinner-icon {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .result.active {
+            display: block;
+        }
+
+        .result video {
+            width: 100%;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .result-info {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .info-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+        }
+
+        .info-link a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .info-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Local Video Generation</h1>
+            <p>Generate videos from text and images using AI</p>
+        </div>
+
+        <div class="content">
+            <div class="warning-box">
+                <h3>⚠️ Legal & Ethical Notice</h3>
+                <ul>
+                    <li><strong>Prohibited:</strong> CSAM, age-ambiguous sexual content, sexual violence, non-consensual deepfakes, bestiality, extremist propaganda, instructions for illegal acts</li>
+                    <li><strong>Responsibility:</strong> You are solely responsible for lawful use of this local service</li>
+                    <li>This tool performs minimal content filtering - use ethically and legally</li>
+                </ul>
+            </div>
+
+            <form id="generateForm">
+                <div class="form-group">
+                    <label for="prompt">Text Prompt *</label>
+                    <textarea
+                        id="prompt"
+                        name="prompt"
+                        placeholder="Describe the video you want to generate..."
+                        required
+                        maxlength="1000"
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="image">Reference Image (optional)</label>
+                    <input type="file" id="image" name="image" accept="image/*">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fps">FPS</label>
+                        <input type="number" id="fps" name="fps" value="24" min="1" max="60">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="num_frames">Number of Frames</label>
+                        <input type="number" id="num_frames" name="num_frames" value="64" min="8" max="240">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="width">Width (px)</label>
+                        <input type="number" id="width" name="width" value="720" min="256" max="1920" step="8">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="height">Height (px)</label>
+                        <input type="number" id="height" name="height" value="720" min="256" max="1080" step="8">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="seed">Seed</label>
+                        <input type="number" id="seed" name="seed" min="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="prefer_backend">Backend</label>
+                        <select id="prefer_backend" name="prefer_backend">
+                            <option value="">Auto (fallback)</option>
+                            <option value="cogvideox" selected>CogVideoX (Best Quality)</option>
+                            <option value="opensora">Open-Sora</option>
+                            <option value="mochi">Mochi (Fastest)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="low_vram" name="low_vram">
+                        <label for="low_vram">Enable Low-VRAM Mode (reduces memory usage)</label>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">Generate Video</button>
+            </form>
+
+            <div class="spinner" id="spinner">
+                <div class="spinner-icon"></div>
+                <p>Generating video... This may take several minutes.</p>
+            </div>
+
+            <div class="error" id="error"></div>
+
+            <div class="result" id="result">
+                <video id="resultVideo" controls></video>
+                <div class="result-info" id="resultInfo"></div>
+            </div>
+
+            <div class="info-link">
+                <a href="/system-info" target="_blank">View System Info</a> |
+                <a href="/health" target="_blank">Health Check</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('generateForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const spinner = document.getElementById('spinner');
+        const result = document.getElementById('result');
+        const error = document.getElementById('error');
+        const resultVideo = document.getElementById('resultVideo');
+        const resultInfo = document.getElementById('resultInfo');
+
+        // Auto-fill random seed on page load
+        function fillRandomSeed() {
+            const seedInput = document.getElementById('seed');
+            seedInput.value = Math.floor(Math.random() * 2147483647);
+        }
+
+        // Fill seed on load
+        fillRandomSeed();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Reset UI
+            error.classList.remove('active');
+            result.classList.remove('active');
+            spinner.classList.add('active');
+            submitBtn.disabled = true;
+
+            // Prepare form data
+            const formData = new FormData(form);
+
+            // Convert checkbox to boolean
+            formData.set('low_vram', document.getElementById('low_vram').checked);
+            // Auto-accept lawful use (checkbox removed from UI)
+            formData.set('lawful_use_consent', true);
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Show result
+                    resultVideo.src = data.video_url;
+                    resultInfo.innerHTML = `
+                        <strong>Generation Complete!</strong><br>
+                        Backend: ${data.backend}<br>
+                        Frames: ${data.frames} @ ${data.fps} FPS<br>
+                        Resolution: ${data.width}x${data.height}<br>
+                        Seed: ${data.seed}<br>
+                        Time: ${data.elapsed_time}s<br>
+                        <a href="${data.video_url}" download>Download Video</a>
+                    `;
+                    result.classList.add('active');
+                } else {
+                    // Show error
+                    error.textContent = data.error || 'Generation failed';
+                    error.classList.add('active');
+                }
+            } catch (err) {
+                error.textContent = `Error: ${err.message}`;
+                error.classList.add('active');
+            } finally {
+                spinner.classList.remove('active');
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

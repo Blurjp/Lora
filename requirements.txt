@@ -1,0 +1,36 @@
+# Core dependencies
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+pydantic==2.6.1
+pydantic-settings==2.1.0
+
+# PyTorch (CUDA 12.1 - adjust for your CUDA version)
+torch==2.3.1
+torchvision==0.18.1
+torchaudio==2.3.1
+# Install with: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# ML/Diffusion libraries
+diffusers==0.30.3  # Required for CogVideoX support
+transformers==4.44.0
+accelerate==0.34.0
+xformers==0.0.27
+safetensors==0.4.4
+sentencepiece==0.2.0
+
+# Video/Image processing
+imageio==2.34.0
+imageio-ffmpeg==0.4.9
+opencv-python==4.9.0.80
+Pillow==10.2.0
+
+# Utilities
+python-dotenv==1.0.1
+numpy==1.26.4
+einops==0.7.0
+huggingface-hub>=0.23.2
+psutil==5.9.8
+
+# Optional (for better performance)
+# Install if available: pip install flash-attn --no-build-isolation
