@@ -212,6 +212,30 @@
             100% { transform: rotate(360deg); }
         }
 
+        .log-box {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: #1e1e1e;
+            border-radius: 6px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .log-box.active {
+            display: block;
+        }
+
+        .log-box pre {
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            color: #00ff00;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
         .result {
             display: none;
             margin-top: 30px;
@@ -273,15 +297,6 @@
         </div>
 
         <div class="content">
-            <div class="warning-box">
-                <h3>⚠️ Legal & Ethical Notice</h3>
-                <ul>
-                    <li><strong>Prohibited:</strong> CSAM, age-ambiguous sexual content, sexual violence, non-consensual deepfakes, bestiality, extremist propaganda, instructions for illegal acts</li>
-                    <li><strong>Responsibility:</strong> You are solely responsible for lawful use of this local service</li>
-                    <li>This tool performs minimal content filtering - use ethically and legally</li>
-                </ul>
-            </div>
-
             <form id="generateForm">
                 <div class="form-group">
                     <label for="prompt">Text Prompt *</label>
@@ -355,6 +370,10 @@
                 <p>Generating video... This may take several minutes.</p>
             </div>
 
+            <div class="log-box" id="logBox">
+                <pre id="logContent"></pre>
+            </div>
+
             <div class="error" id="error"></div>
 
             <div class="result" id="result">
@@ -377,6 +396,8 @@
         const error = document.getElementById('error');
         const resultVideo = document.getElementById('resultVideo');
         const resultInfo = document.getElementById('resultInfo');
+        const logBox = document.getElementById('logBox');
+        const logContent = document.getElementById('logContent');
 
         // Auto-fill random seed on page load
         function fillRandomSeed() {
@@ -387,6 +408,18 @@
         // Fill seed on load
         fillRandomSeed();
 
+        // Add log message to UI
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logContent.textContent += `[${timestamp}] ${message}\n`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        // Clear logs
+        function clearLogs() {
+            logContent.textContent = '';
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -394,7 +427,9 @@
             error.classList.remove('active');
             result.classList.remove('active');
             spinner.classList.add('active');
+            logBox.classList.add('active');
             submitBtn.disabled = true;
+            clearLogs();
 
             // Prepare form data
             const formData = new FormData(form);
@@ -404,16 +439,44 @@
             // Auto-accept lawful use (checkbox removed from UI)
             formData.set('lawful_use_consent', true);
 
+            // Log generation start
+            addLog('🚀 Starting video generation...');
+            addLog(`📝 Prompt: ${formData.get('prompt').substring(0, 100)}...`);
+            addLog(`🎬 Settings: ${formData.get('num_frames')} frames, ${formData.get('width')}x${formData.get('height')}, ${formData.get('fps')} fps`);
+            addLog(`🎲 Seed: ${formData.get('seed')}`);
+            addLog(`🔧 Backend: ${formData.get('prefer_backend') || 'auto'}`);
+            addLog('');
+            addLog('⏳ Uploading request and initializing backend...');
+
+            const startTime = Date.now();
+
             try {
                 const response = await fetch('/generate', {
                     method: 'POST',
                     body: formData
                 });
 
+                addLog('📦 Request sent, waiting for backend response...');
+                addLog('🔄 Backend is loading models and initializing...');
+                addLog('⚙️ This may take 2-3 minutes on first request...');
+                addLog('');
+
                 const data = await response.json();
+
+                const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
 
                 if (data.success) {
                     // Show result
+                    addLog('✅ Generation completed successfully!');
+                    addLog(`⏱️ Total time: ${elapsedTime}s`);
+                    addLog(`🎥 Backend used: ${data.backend}`);
+                    addLog(`📊 Frames: ${data.frames} @ ${data.fps} FPS`);
+                    addLog(`📐 Resolution: ${data.width}x${data.height}`);
+                    addLog(`🎲 Seed: ${data.seed}`);
+                    addLog(`💾 Video saved: ${data.video_url}`);
+                    addLog('');
+                    addLog('🎉 Video is ready! Scroll down to view.');
+
                     resultVideo.src = data.video_url;
                     resultInfo.innerHTML = `
                         <strong>Generation Complete!</strong><br>
@@ -421,16 +484,22 @@
                         Frames: ${data.frames} @ ${data.fps} FPS<br>
                         Resolution: ${data.width}x${data.height}<br>
                         Seed: ${data.seed}<br>
-                        Time: ${data.elapsed_time}s<br>
+                        Time: ${elapsedTime}s<br>
                         <a href="${data.video_url}" download>Download Video</a>
                     `;
                     result.classList.add('active');
                 } else {
                     // Show error
+                    addLog('');
+                    addLog('❌ Generation failed!');
+                    addLog(`⚠️ Error: ${data.error || 'Unknown error'}`);
                     error.textContent = data.error || 'Generation failed';
                     error.classList.add('active');
                 }
             } catch (err) {
+                addLog('');
+                addLog('❌ Request failed!');
+                addLog(`⚠️ Error: ${err.message}`);
                 error.textContent = `Error: ${err.message}`;
                 error.classList.add('active');
             } finally {
