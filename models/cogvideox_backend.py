@@ -272,22 +272,20 @@ class CogVideoXBackend:
         )
 
         # CogVideoX model constraints
-        # T2V: 720x480 recommended
-        # I2V: 768x1360 recommended (official repo)
+        # T2V: Flexible resolution (recommend 720x480)
+        # I2V: FIXED 480x720 (cannot be changed - model limitation)
 
         # Check if using I2V
         using_i2v = ref_image_path and self.i2v_pipeline
 
         if using_i2v:
-            # I2V: Use official recommended dimensions
-            cogvideo_height = 480  # Can vary
-            cogvideo_width = 720   # Can vary
-            # Ensure dimensions are multiples of 16
-            cogvideo_width = (max(480, min(width, 1360)) // 16) * 16
-            cogvideo_height = (max(480, min(height, 1360)) // 16) * 16
-            logger.info(f"I2V mode: Using dimensions {cogvideo_width}x{cogvideo_height}")
+            # I2V: MUST use model's built-in default (480x720)
+            # CogVideoX-5b-I2V does NOT accept custom resolutions
+            cogvideo_width = 720   # Fixed by model
+            cogvideo_height = 480  # Fixed by model
+            logger.info(f"I2V mode: Using model default resolution {cogvideo_width}x{cogvideo_height} (fixed)")
         else:
-            # T2V: Standard dimensions
+            # T2V: Standard dimensions (user-configurable)
             if self.low_vram:
                 cogvideo_width = min(width, 480)
                 cogvideo_height = min(height, 480)
@@ -332,16 +330,15 @@ class CogVideoXBackend:
             with torch.no_grad():
                 if ref_image and self.i2v_pipeline:
                     # Image-to-video generation
-                    # CRITICAL: Pass height/width parameters (official repo does this!)
-                    logger.info(f"I2V generation with height={cogvideo_height}, width={cogvideo_width}")
+                    # CRITICAL: Do NOT pass height/width for I2V - uses model defaults only
+                    logger.info(f"I2V generation (using model defaults: {cogvideo_width}x{cogvideo_height})")
                     video = self.i2v_pipeline(
                         prompt=prompt,
                         image=ref_image,
                         num_videos_per_prompt=1,
                         num_inference_steps=50,
                         num_frames=cogvideo_frames,
-                        height=cogvideo_height,  # MUST pass this!
-                        width=cogvideo_width,    # MUST pass this!
+                        # height and width NOT passed - I2V uses fixed defaults
                         guidance_scale=6.0,
                         use_dynamic_cfg=True,
                         generator=generator,
