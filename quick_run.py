@@ -140,19 +140,9 @@ def main():
     print("=" * 70)
     print()
 
-    # Check if in virtual environment
+    # Check if in virtual environment (warning only, auto-continue)
     if not check_venv():
-        print("[WARNING] Not running in virtual environment!")
-        print("[INFO] Activate venv first:")
-        if sys.platform == "win32":
-            print("       venv\\Scripts\\activate")
-        else:
-            print("       source venv/bin/activate")
-        print()
-        response = input("Continue anyway? [y/N]: ")
-        if response.lower() != 'y':
-            print("[INFO] Exiting. Please activate virtual environment first.")
-            return 1
+        print("[INFO] Not running in virtual environment (continuing anyway)")
         print()
 
     # Check if dependencies are installed
