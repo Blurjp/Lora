@@ -383,11 +383,29 @@ class CogVideoXBackend:
                         allocated = torch.cuda.memory_allocated() / (1024**3)
                         reserved = torch.cuda.memory_reserved() / (1024**3)
                         free = torch.cuda.get_device_properties(0).total_memory / (1024**3) - allocated
-                        logger.info(f"🖥️  GPU State BEFORE generation:")
+                        logger.info(f"🖥️  GPU State BEFORE freeing T2V:")
                         logger.info(f"   Allocated: {allocated:.2f}GB")
                         logger.info(f"   Reserved: {reserved:.2f}GB")
                         logger.info(f"   Free: {free:.2f}GB")
                         logger.info("")
+
+                    # CRITICAL FIX: Unload T2V pipeline to free GPU memory for I2V
+                    # Both pipelines loaded = ~40GB (impossible on 24GB GPU)
+                    if self.pipeline is not None:
+                        logger.info("🔄 Unloading T2V pipeline to free GPU memory for I2V...")
+                        try:
+                            # Move T2V to CPU to free GPU memory
+                            self.pipeline = self.pipeline.to("cpu")
+                            torch.cuda.empty_cache()
+
+                            if torch.cuda.is_available():
+                                allocated_after = torch.cuda.memory_allocated() / (1024**3)
+                                freed = allocated - allocated_after
+                                logger.info(f"   ✓ Freed {freed:.2f}GB GPU memory")
+                                logger.info(f"   GPU now: {allocated_after:.2f}GB allocated")
+                                logger.info("")
+                        except Exception as e:
+                            logger.warning(f"Could not move T2V to CPU: {e}")
 
                     logger.info("🚀 Calling I2V pipeline...")
                     logger.info("⏳ Generation starting (will log progress every 5 steps)")
@@ -447,6 +465,16 @@ class CogVideoXBackend:
                     gen_elapsed = time.time() - gen_start
                     logger.info(f"✅ I2V generation completed in {gen_elapsed:.1f}s")
                     logger.info("")
+
+                    # Reload T2V pipeline back to GPU for future T2V requests
+                    if self.pipeline is not None and self.device == "cuda":
+                        logger.info("🔄 Reloading T2V pipeline to GPU for future use...")
+                        try:
+                            self.pipeline = self.pipeline.to(self.device)
+                            logger.info("   ✓ T2V pipeline reloaded to GPU")
+                            logger.info("")
+                        except Exception as e:
+                            logger.warning(f"Could not reload T2V to GPU: {e}")
                 else:
                     # Text-to-video generation
                     if ref_image_path:
