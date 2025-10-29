@@ -389,15 +389,15 @@ class CogVideoXBackend:
                         logger.info(f"   Free: {free:.2f}GB")
                         logger.info("")
 
-                    # Create progress callback
-                    progress_callback = DebugProgressCallback(logger)
-
                     logger.info("🚀 Calling I2V pipeline...")
-                    logger.info("⏳ Waiting for first step (this is where it usually hangs)...")
+                    logger.info("⏳ Generation starting (no progress callbacks - I2V doesn't support them)")
+                    logger.info("   This will take 5-15 minutes with no intermediate updates")
                     logger.info("")
 
                     gen_start = time.time()
 
+                    # NOTE: I2V pipeline doesn't support callback/callback_steps in diffusers 0.30.3
+                    # Progress won't be shown during generation
                     video = self.i2v_pipeline(
                         prompt=prompt,
                         image=ref_image,
@@ -408,8 +408,6 @@ class CogVideoXBackend:
                         guidance_scale=6.0,
                         use_dynamic_cfg=True,
                         generator=generator,
-                        callback=progress_callback,
-                        callback_steps=1,  # Call on every step
                     ).frames[0]
 
                     gen_elapsed = time.time() - gen_start
