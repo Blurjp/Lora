@@ -390,24 +390,58 @@ class CogVideoXBackend:
                         logger.info("")
 
                     logger.info("🚀 Calling I2V pipeline...")
-                    logger.info("⏳ Generation starting (no progress callbacks - I2V doesn't support them)")
-                    logger.info("   This will take 5-15 minutes with no intermediate updates")
+                    logger.info("⏳ Generation starting (will log progress every 5 steps)")
                     logger.info("")
+
+                    def log_i2v_step(pipe, step: int, timestep: int, callback_kwargs: Dict[str, torch.Tensor]):
+                        """
+                        Emit periodic progress updates from the I2V denoising loop.
+
+                        Args:
+                            pipe: Active pipeline instance (unused but required by diffusers API)
+                            step: Zero-based index of the current scheduler step
+                            timestep: Scheduler timestep value
+                            callback_kwargs: Tensors requested via callback_on_step_end_tensor_inputs
+                        """
+                        latents = callback_kwargs.get("latents")
+
+                        if step == 0:
+                            logger.info("\U0001f680 I2V denoising loop started")
+
+                        if step % 5 == 0 or step >= 48:
+                            logger.info(
+                                "   \U0001f504 Step %02d/50 | timestep=%s | latents=%s | device=%s",
+                                step + 1,
+                                timestep,
+                                tuple(latents.shape) if latents is not None else "unknown",
+                                latents.device if latents is not None else "unknown",
+                            )
+
+                            if torch.cuda.is_available():
+                                allocated = torch.cuda.memory_allocated() / (1024**3)
+                                reserved = torch.cuda.memory_reserved() / (1024**3)
+                                logger.info(
+                                    "      GPU memory: %.2fGB allocated / %.2fGB reserved",
+                                    allocated,
+                                    reserved
+                                )
+
+                        return {}
 
                     gen_start = time.time()
 
-                    # NOTE: I2V pipeline doesn't support callback/callback_steps in diffusers 0.30.3
-                    # Progress won't be shown during generation
                     video = self.i2v_pipeline(
                         prompt=prompt,
                         image=ref_image,
                         num_videos_per_prompt=1,
                         num_inference_steps=50,
                         num_frames=cogvideo_frames,
-                        # height and width NOT passed - I2V uses fixed defaults
+                        # height/width NOT passed - I2V uses fixed 720x480 resolution
                         guidance_scale=6.0,
                         use_dynamic_cfg=True,
                         generator=generator,
+                        callback_on_step_end=log_i2v_step,
+                        callback_on_step_end_tensor_inputs=["latents"],
                     ).frames[0]
 
                     gen_elapsed = time.time() - gen_start
