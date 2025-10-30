@@ -488,20 +488,42 @@ class CogVideoXBackend:
                     if torch.cuda.is_available():
                         allocated = torch.cuda.memory_allocated() / (1024**3)
                         reserved = torch.cuda.memory_reserved() / (1024**3)
-                        logger.info(f"🖥️  GPU State BEFORE T2V generation:")
+                        free = torch.cuda.get_device_properties(0).total_memory / (1024**3) - allocated
+                        logger.info(f"🖥️  GPU State BEFORE freeing I2V:")
                         logger.info(f"   Allocated: {allocated:.2f}GB")
                         logger.info(f"   Reserved: {reserved:.2f}GB")
+                        logger.info(f"   Free: {free:.2f}GB")
+                        logger.info("")
 
-                        # Check if pipeline is on GPU
+                    # CRITICAL FIX: Unload I2V pipeline to free GPU memory for T2V
+                    # Both pipelines loaded = ~40GB (impossible on 24GB GPU)
+                    if self.i2v_pipeline is not None:
+                        logger.info("🔄 Unloading I2V pipeline to free GPU memory for T2V...")
+                        try:
+                            # Move I2V to CPU to free GPU memory
+                            self.i2v_pipeline = self.i2v_pipeline.to("cpu")
+                            torch.cuda.empty_cache()
+
+                            if torch.cuda.is_available():
+                                allocated_after = torch.cuda.memory_allocated() / (1024**3)
+                                freed = allocated - allocated_after
+                                logger.info(f"   ✓ Freed {freed:.2f}GB GPU memory")
+                                logger.info(f"   GPU now: {allocated_after:.2f}GB allocated")
+                                logger.info("")
+                        except Exception as e:
+                            logger.warning(f"Could not move I2V to CPU: {e}")
+
+                    # Check if T2V pipeline is on GPU
+                    if torch.cuda.is_available():
                         try:
                             pipeline_device = next(self.pipeline.transformer.parameters()).device
-                            logger.info(f"   Pipeline device: {pipeline_device}")
+                            logger.info(f"   T2V Pipeline device: {pipeline_device}")
 
                             if str(pipeline_device) == "cpu" and self.device == "cuda":
-                                logger.warning("   ⚠️  Pipeline is on CPU but should be on GPU!")
+                                logger.warning("   ⚠️  T2V Pipeline is on CPU but should be on GPU!")
                                 logger.info("   🔄 Moving T2V pipeline to GPU...")
                                 self.pipeline = self.pipeline.to(self.device)
-                                logger.info("   ✓ Pipeline moved to GPU")
+                                logger.info("   ✓ T2V Pipeline moved to GPU")
                         except Exception as e:
                             logger.warning(f"Could not check pipeline device: {e}")
                         logger.info("")
@@ -544,6 +566,16 @@ class CogVideoXBackend:
                     gen_elapsed = time.time() - gen_start
                     logger.info(f"✅ T2V generation completed in {gen_elapsed:.1f}s")
                     logger.info("")
+
+                    # Reload I2V pipeline back to GPU for future I2V requests
+                    if self.i2v_pipeline is not None and self.device == "cuda":
+                        logger.info("🔄 Reloading I2V pipeline to GPU for future use...")
+                        try:
+                            self.i2v_pipeline = self.i2v_pipeline.to(self.device)
+                            logger.info("   ✓ I2V pipeline reloaded to GPU")
+                            logger.info("")
+                        except Exception as e:
+                            logger.warning(f"Could not reload I2V to GPU: {e}")
 
             # video is a list of PIL Images or numpy arrays
             # Convert to numpy array if needed
