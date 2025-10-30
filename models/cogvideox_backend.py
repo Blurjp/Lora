@@ -477,8 +477,55 @@ class CogVideoXBackend:
                             logger.warning(f"Could not reload T2V to GPU: {e}")
                 else:
                     # Text-to-video generation
+                    logger.info("🎬 Using T2V (Text-to-Video) pipeline")
+                    logger.info(f"📐 Resolution: {cogvideo_width}x{cogvideo_height}")
+                    logger.info(f"📝 Prompt: {prompt[:100]}...")
+                    logger.info(f"🎲 Seed: {seed}")
+                    logger.info(f"🎞️  Frames: {cogvideo_frames}")
+                    logger.info("")
+
+                    # Log GPU state and verify pipeline location
+                    if torch.cuda.is_available():
+                        allocated = torch.cuda.memory_allocated() / (1024**3)
+                        reserved = torch.cuda.memory_reserved() / (1024**3)
+                        logger.info(f"🖥️  GPU State BEFORE T2V generation:")
+                        logger.info(f"   Allocated: {allocated:.2f}GB")
+                        logger.info(f"   Reserved: {reserved:.2f}GB")
+
+                        # Check if pipeline is on GPU
+                        try:
+                            pipeline_device = next(self.pipeline.transformer.parameters()).device
+                            logger.info(f"   Pipeline device: {pipeline_device}")
+
+                            if str(pipeline_device) == "cpu" and self.device == "cuda":
+                                logger.warning("   ⚠️  Pipeline is on CPU but should be on GPU!")
+                                logger.info("   🔄 Moving T2V pipeline to GPU...")
+                                self.pipeline = self.pipeline.to(self.device)
+                                logger.info("   ✓ Pipeline moved to GPU")
+                        except Exception as e:
+                            logger.warning(f"Could not check pipeline device: {e}")
+                        logger.info("")
+
                     if ref_image_path:
                         logger.warning("I2V pipeline not available, using T2V mode")
+
+                    def log_t2v_step(pipe, step: int, timestep: int, callback_kwargs: Dict[str, torch.Tensor]):
+                        """Progress callback for T2V generation."""
+                        if step % 5 == 0 or step >= 48:
+                            latents = callback_kwargs.get("latents")
+                            logger.info(
+                                "   🔄 T2V Step %02d/50 | timestep=%s | latents=%s",
+                                step + 1,
+                                timestep,
+                                tuple(latents.shape) if latents is not None else "unknown",
+                            )
+                        return {}
+
+                    logger.info("🚀 Calling T2V pipeline...")
+                    logger.info("⏳ Generation starting (will log progress every 5 steps)")
+                    logger.info("")
+
+                    gen_start = time.time()
 
                     video = self.pipeline(
                         prompt=prompt,
@@ -490,7 +537,13 @@ class CogVideoXBackend:
                         height=cogvideo_height,
                         width=cogvideo_width,
                         use_dynamic_cfg=True,
+                        callback_on_step_end=log_t2v_step,
+                        callback_on_step_end_tensor_inputs=["latents"],
                     ).frames[0]
+
+                    gen_elapsed = time.time() - gen_start
+                    logger.info(f"✅ T2V generation completed in {gen_elapsed:.1f}s")
+                    logger.info("")
 
             # video is a list of PIL Images or numpy arrays
             # Convert to numpy array if needed
